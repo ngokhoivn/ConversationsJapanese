@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(setVh, 100);
     });
 
+    // Đảm bảo tất cả các phần tử DOM đã được tải đầy đủ
     const chatArea = document.getElementById('chat-area');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
@@ -20,9 +21,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const clearInputButton = document.getElementById('clear-input');
     const translateButton = document.getElementById('translate-button');
 
-    translateButton.addEventListener('click', function () {
-        window.location.href = 'Translate.html';
-    });
+    // Kiểm tra xem các phần tử có tồn tại không
+    if (!chatArea) console.error('Element #chat-area not found');
+    if (!userInput) console.error('Element #user-input not found');
+    if (!sendButton) console.error('Element #send-button not found');
+    if (!typingIndicator) console.error('Element #typing-indicator not found');
+    if (!clearChatButton) console.error('Element #clear-chat not found');
+    if (!clearInputButton) console.error('Element #clear-input not found');
+    if (!translateButton) console.error('Element #translate-button not found');
+
+    // Thêm kiểm tra trước khi gắn sự kiện
+    if (translateButton) {
+        translateButton.addEventListener('click', function () {
+            window.location.href = 'Translate.html';
+        });
+    }
 
     const DEFAULT_API_KEYS = [
         'AIzaSyDjgTk4uZQUCpFH5Zt8ZgP2CW-jhmkLv8o',
@@ -41,19 +54,40 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Load conversation history from localStorage or initialize with welcome message
-    let conversationHistory = JSON.parse(localStorage.getItem('conversation_history')) || [
-        {
-            role: "model",
-            parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か面白いトピックや質問はありますか？例えば、好きなアニメや最近の出来事とか！😄" }]
-        }
-    ];
+    let conversationHistory = [];
+    try {
+        // Thêm xử lý ngoại lệ cho localStorage
+        const savedHistory = localStorage.getItem('conversation_history');
+        conversationHistory = savedHistory ? JSON.parse(savedHistory) : [
+            {
+                role: "model",
+                parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か面白いトピックや質問はありますか？例えば、好きなアニメや最近の出来事とか！😄" }]
+            }
+        ];
+    } catch (error) {
+        console.error('Error loading conversation history:', error);
+        conversationHistory = [
+            {
+                role: "model",
+                parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か面白いトピックや質問はありますか？例えば、好きなアニメや最近の出来事とか！😄" }]
+            }
+        ];
+    }
 
     // Context box to store summarized conversation context
-    let conversationContext = localStorage.getItem('conversation_context') || '';
+    let conversationContext = '';
+    try {
+        conversationContext = localStorage.getItem('conversation_context') || '';
+    } catch (error) {
+        console.error('Error loading conversation context:', error);
+        conversationContext = '';
+    }
     let messageCount = conversationHistory.filter(msg => msg.role === "user").length;
 
     // Render existing conversation messages
     function renderConversation() {
+        if (!chatArea) return;
+        
         chatArea.innerHTML = '';
         conversationHistory.forEach(msg => {
             if (msg.role === "user" || msg.role === "model") {
@@ -82,18 +116,28 @@ ${recentMessages}
             try {
                 const contextResponse = await sendToGeminiAPI(contextPrompt, true);
                 conversationContext = contextResponse;
-                localStorage.setItem('conversation_context', conversationContext);
+                try {
+                    localStorage.setItem('conversation_context', conversationContext);
+                } catch (error) {
+                    console.error('Failed to save context to localStorage:', error);
+                }
                 console.log('Updated context:', conversationContext);
             } catch (error) {
                 console.error('Failed to update context:', error);
                 conversationContext = '会話のコンテキストを更新できませんでした。';
-                localStorage.setItem('conversation_context', conversationContext);
+                try {
+                    localStorage.setItem('conversation_context', conversationContext);
+                } catch (storageError) {
+                    console.error('Failed to save context to localStorage:', storageError);
+                }
             }
         }
     }
 
     // Handle sending messages
     async function handleSendMessage() {
+        if (!userInput || !chatArea || !typingIndicator) return;
+        
         const message = userInput.value.trim();
         if (message === '') return;
 
@@ -106,7 +150,7 @@ ${recentMessages}
         saveConversation();
 
         userInput.value = '';
-        typingIndicator.style.display = 'flex';
+        if (typingIndicator) typingIndicator.style.display = 'flex';
         chatArea.scrollTop = chatArea.scrollHeight;
 
         try {
@@ -131,8 +175,8 @@ ${recentMessages}
             });
             saveConversation();
         } finally {
-            typingIndicator.style.display = 'none';
-            chatArea.scrollTop = chatArea.scrollHeight;
+            if (typingIndicator) typingIndicator.style.display = 'none';
+            if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
         }
     }
 
@@ -158,9 +202,12 @@ ${recentMessages}
 
     // Handle keyboard visibility change on iOS
     function handleVisualViewportResize() {
+        if (!window.visualViewport || !chatArea) return;
+        
         const isKeyboardVisible = window.visualViewport.height < window.innerHeight * 0.8;
         const keyboardHeight = isKeyboardVisible ? window.innerHeight - window.visualViewport.height : 0;
-        document.querySelector('.input-area').style.bottom = `${keyboardHeight}px`;
+        const inputArea = document.querySelector('.input-area');
+        if (inputArea) inputArea.style.bottom = `${keyboardHeight}px`;
         chatArea.style.marginBottom = `${keyboardHeight + 80}px`;
         chatArea.scrollTop = chatArea.scrollHeight;
     }
@@ -172,6 +219,8 @@ ${recentMessages}
 
     // Add a message to the chat UI
     function addMessageToChat(content, sender, scroll = true) {
+        if (!chatArea) return;
+        
         const lastMsg = chatArea.lastElementChild?.querySelector('.message-bubble')?.textContent;
         if (lastMsg && lastMsg === content) return;
 
@@ -216,6 +265,13 @@ ${recentMessages}
         readBtn.setAttribute('aria-label', 'メッセージを読み上げる');
         readBtn.onclick = () => {
             if (!cleanText || !cleanText.trim()) return;
+            // Kiểm tra xem trình duyệt có hỗ trợ SpeechSynthesis không
+            if (!window.speechSynthesis) {
+                console.error("SpeechSynthesis not supported");
+                alert("お使いのブラウザは音声合成をサポートしていません。");
+                return;
+            }
+            
             const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.lang = 'ja-JP';
             utterance.rate = 0.9;
@@ -230,18 +286,24 @@ ${recentMessages}
                 if (jpVoice) utterance.voice = jpVoice;
                 speechSynthesis.speak(utterance);
             };
-            if (speechSynthesis.getVoices().length > 0) {
-                speak();
-            } else {
-                speechSynthesis.onvoiceschanged = () => {
+            
+            try {
+                if (speechSynthesis.getVoices().length > 0) {
                     speak();
-                    speechSynthesis.onvoiceschanged = null;
-                };
-                setTimeout(() => {
-                    if (speechSynthesis.getVoices().length === 0) {
-                        alert("音声を読み込めませんでした。音声設定を確認するか、後でもう一度お試しください。");
-                    }
-                }, 5000);
+                } else {
+                    speechSynthesis.onvoiceschanged = () => {
+                        speak();
+                        speechSynthesis.onvoiceschanged = null;
+                    };
+                    setTimeout(() => {
+                        if (speechSynthesis.getVoices().length === 0) {
+                            alert("音声を読み込めませんでした。音声設定を確認するか、後でもう一度お試しください。");
+                        }
+                    }, 5000);
+                }
+            } catch (error) {
+                console.error("SpeechSynthesis error:", error);
+                alert("音声合成でエラーが発生しました。");
             }
         };
 
@@ -254,16 +316,43 @@ ${recentMessages}
         copyBtn.title = 'コピー';
         copyBtn.setAttribute('aria-label', 'メッセージをコピーする');
         copyBtn.onclick = () => {
-            navigator.clipboard.writeText(content).then(() => {
-                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                </svg>`;
-                setTimeout(() => {
+            try {
+                navigator.clipboard.writeText(content).then(() => {
                     copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                     </svg>`;
-                }, 1000);
-            });
+                    setTimeout(() => {
+                        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>`;
+                    }, 1000);
+                }).catch(err => {
+                    console.error("Clipboard API error:", err);
+                    alert("クリップボードへのコピーに失敗しました。");
+                });
+            } catch (error) {
+                console.error("Copy button error:", error);
+                // Fallback for older browsers
+                const textArea = document.createElement("textarea");
+                textArea.value = content;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                    </svg>`;
+                    setTimeout(() => {
+                        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>`;
+                    }, 1000);
+                } catch (e) {
+                    console.error("execCommand copy failed:", e);
+                    alert("クリップボードへのコピーに失敗しました。");
+                }
+                document.body.removeChild(textArea);
+            }
         };
 
         actionsDiv.appendChild(readBtn);
@@ -275,13 +364,17 @@ ${recentMessages}
 
         if (scroll) {
             setTimeout(() => {
-                chatArea.scrollTop = chatArea.scrollHeight;
+                if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
             }, 10);
         }
     }
 
     function saveConversation() {
-        localStorage.setItem('conversation_history', JSON.stringify(conversationHistory));
+        try {
+            localStorage.setItem('conversation_history', JSON.stringify(conversationHistory));
+        } catch (error) {
+            console.error('Error saving conversation to localStorage:', error);
+        }
     }
 
     async function sendToGeminiAPI(message, isContextGeneration = false) {
@@ -359,42 +452,66 @@ ${recentMessages}
     }
 
     function handleKeyboard() {
+        if (!chatArea) return;
         setTimeout(() => {
             chatArea.scrollTop = chatArea.scrollHeight;
         }, 300);
     }
-    userInput.addEventListener('focus', handleKeyboard);
+    
+    // Kiểm tra trước khi thêm sự kiện
+    if (userInput) {
+        userInput.addEventListener('focus', handleKeyboard);
+    }
 
-    chatArea.addEventListener('touchstart', function () {
-        chatArea.style.overflowY = 'scroll';
-    });
+    if (chatArea) {
+        chatArea.addEventListener('touchstart', function () {
+            chatArea.style.overflowY = 'scroll';
+        });
+    }
 
-    sendButton.addEventListener('click', handleSendMessage);
+    if (sendButton) {
+        sendButton.addEventListener('click', handleSendMessage);
+    }
 
-    userInput.addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') {
-            handleSendMessage();
-        }
-    });
-
-    clearChatButton.addEventListener('click', function () {
-        conversationHistory = [
-            {
-                role: "model",
-                parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か面白いトピックや質問はありますか？例えば、好きなアニメや最近の出来事とか！😄" }]
+    if (userInput) {
+        userInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                handleSendMessage();
             }
-        ];
-        conversationContext = '';
-        messageCount = 0;
-        localStorage.setItem('conversation_context', '');
-        saveConversation();
-        renderConversation();
-    });
+        });
+    }
 
-    clearInputButton.addEventListener('click', function () {
-        userInput.value = '';
+    if (clearChatButton) {
+        clearChatButton.addEventListener('click', function () {
+            conversationHistory = [
+                {
+                    role: "model",
+                    parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か面白いトピックや質問はありますか？例えば、好きなアニメや最近の出来事とか！😄" }]
+                }
+            ];
+            conversationContext = '';
+            messageCount = 0;
+            try {
+                localStorage.setItem('conversation_context', '');
+            } catch (error) {
+                console.error('Error clearing context in localStorage:', error);
+            }
+            saveConversation();
+            renderConversation();
+        });
+    }
+
+    if (clearInputButton) {
+        clearInputButton.addEventListener('click', function () {
+            if (userInput) {
+                userInput.value = '';
+                userInput.focus();
+            }
+        });
+    }
+
+    // Kiểm tra xem userInput có tồn tại không trước khi sử dụng
+    if (userInput) {
         userInput.focus();
-    });
-
-    userInput.focus();
+    }
 });
