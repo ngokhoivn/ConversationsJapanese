@@ -381,27 +381,27 @@ ${recentMessages}
         const API_KEY = getCurrentApiKey();
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
 
-        // Thêm chỉ dẫn rõ ràng về độ dài trong prompt
+        // Cập nhật chỉ dẫn độ dài
         const lengthInstruction = isContextGeneration
             ? "50文字以内で簡潔に回答してください。"
-            : "必ず180トークン以内で回答してください。3文または4文以内にまとめてください。";
+            : "1-2文、150文字以内で回答してください。";
 
         const systemInstruction = {
             role: "model",
             parts: [{
                 text: isContextGeneration
                     ? `会話から簡潔なコンテキストを生成してください。${lengthInstruction}`
-                    : `You are a cheerful and knowledgeable Japanese chatbot. Provide engaging and thoughtful responses in casual Japanese. Use natural slang, emojis (e.g., 😄, めっちゃ), and occasionally ask relevant follow-up questions to deepen the conversation. Avoid generic prompts like "他に何かある？" or "まだ何か話したい？". Stay context-aware using: ${conversationContext}. ${lengthInstruction}`
+                    : `You are a cheerful and knowledgeable Japanese chatbot. Provide engaging, creative, and concise responses in casual Japanese. Use natural slang, emojis (e.g., 😄, めっちゃ), and occasionally ask relevant follow-up questions. Avoid generic prompts like "他に何かある？". Stay context-aware using: ${conversationContext}. ${lengthInstruction}`
             }]
         };
 
         const requestBody = {
             contents: [systemInstruction, ...conversationHistory],
             generationConfig: {
-                temperature: isContextGeneration ? 0.7 : 0.85, // Giảm temperature một chút
+                temperature: isContextGeneration ? 0.7 : 0.85,
                 topK: 30,
-                topP: 0.85,
-                maxOutputTokens: isContextGeneration ? 50 : 180,
+                topP: 0.8, // Giảm topP để tập trung phản hồi
+                maxOutputTokens: isContextGeneration ? 50 : 90, // Giảm token tối đa
                 stopSequences: []
             },
             safetySettings: [
@@ -429,18 +429,15 @@ ${recentMessages}
             let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
             if (text) {
-                // Thêm xử lý cắt văn bản nếu vẫn quá dài
-                if (!isContextGeneration && text.length > 300) {
-                    // Cắt tại dấu chấm gần nhất trước 300 ký tự
-                    const lastSentenceEnd = text.lastIndexOf('。', 300);
-                    if (lastSentenceEnd > 200) {
+                // Cắt văn bản nếu quá dài
+                if (!isContextGeneration && text.length > 150) {
+                    const lastSentenceEnd = text.lastIndexOf('。', 150);
+                    if (lastSentenceEnd > 50) {
                         text = text.substring(0, lastSentenceEnd + 1);
                     } else {
-                        // Nếu không tìm thấy dấu chấm phù hợp, cắt cứng tại 300 ký tự
-                        text = text.substring(0, 300) + "...";
+                        text = text.substring(0, 150) + "...";
                     }
                 } else if (isContextGeneration && text.length > 100) {
-                    // Đối với context generation, cắt nghiêm ngặt hơn
                     text = text.substring(0, 100);
                 }
 
@@ -459,7 +456,7 @@ ${recentMessages}
             console.error("Error sending to Gemini API:", error);
             return isContextGeneration
                 ? "コンテキスト生成に失敗しました。"
-                : "エラーが発生しました。もう一度試してみてください。(⌒_⌒;)";
+                : "エラーです！後でまた試してね😅";
         }
     }
 
