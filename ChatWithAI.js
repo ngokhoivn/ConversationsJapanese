@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let conversationHistory = JSON.parse(localStorage.getItem('conversation_history')) || [
         {
             role: "model",
-            parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か話したいことはありますか？" }]
+            parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か面白いトピックや質問はありますか？例えば、好きなアニメや最近の出来事とか！😄" }]
         }
     ];
 
@@ -111,7 +111,9 @@ ${recentMessages}
 
         try {
             await updateConversationContext();
-            const response = await sendToGeminiAPI(message);
+            let response = await sendToGeminiAPI(message);
+            // Filter out generic follow-ups
+            response = filterGenericResponses(response);
             addMessageToChat(response, 'bot');
             conversationHistory.push({
                 role: "model",
@@ -132,6 +134,26 @@ ${recentMessages}
             typingIndicator.style.display = 'none';
             chatArea.scrollTop = chatArea.scrollHeight;
         }
+    }
+
+    // Filter out generic or unengaging responses
+    function filterGenericResponses(response) {
+        const genericPhrases = [
+            '他に何かある？',
+            'まだ何か話したい？',
+            '何か面白いことある？',
+            '次は何？',
+            '何か用？'
+        ];
+        let modifiedResponse = response;
+        genericPhrases.forEach(phrase => {
+            if (modifiedResponse.includes(phrase)) {
+                modifiedResponse = modifiedResponse.replace(phrase, '');
+                // Add a more engaging follow-up
+                modifiedResponse += '\nちなみに、この話題についてもっと深く話したい？ それとも他の面白いネタある？😉';
+            }
+        });
+        return modifiedResponse.trim();
     }
 
     // Handle keyboard visibility change on iOS
@@ -224,6 +246,7 @@ ${recentMessages}
         };
 
         const copyBtn = document.createElement('button');
+        copyBtn.class | `copy-btn` = document.createElement('button');
         copyBtn.className = 'icon-btn';
         copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
             <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
@@ -270,17 +293,17 @@ ${recentMessages}
             parts: [{
                 text: isContextGeneration 
                     ? "会話から簡潔なコンテキストを生成してください。"
-                    : `You are a cheerful Japanese chatbot. Reply in casual Japanese, short (1–2 sentences max), and friendly. Use slang or emojis sometimes like (笑), マジ!? to sound natural. Current context: ${conversationContext}`
+                    : `You are a cheerful and knowledgeable Japanese chatbot. Provide detailed, engaging, and thoughtful responses in casual Japanese (3-5 sentences). Use natural slang, emojis (e.g., 😄, めっちゃ), and occasionally ask relevant follow-up questions or share related insights to deepen the conversation. Avoid generic prompts like "他に何かある？" or "まだ何か話したい？". Stay context-aware using: ${conversationContext}`
             }]
         };
 
         const requestBody = {
             contents: [systemInstruction, ...conversationHistory],
             generationConfig: {
-                temperature: isContextGeneration ? 0.7 : 0.85,
+                temperature: isContextGeneration ? 0.7 : 0.9, // Higher for creative responses
                 topK: 40,
                 topP: 0.95,
-                maxOutputTokens: isContextGeneration ? 50 : 100,
+                maxOutputTokens: isContextGeneration ? 50 : 300, // Allow longer responses
                 stopSequences: []
             },
             safetySettings: [
@@ -351,7 +374,7 @@ ${recentMessages}
         conversationHistory = [
             {
                 role: "model",
-                parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か話したいことはありますか？" }]
+                parts: [{ text: "こんにちは！日本語の練習や会話を楽しみましょう！何か面白いトピックや質問はありますか？例えば、好きなアニメや最近の出来事とか！😄" }]
             }
         ];
         conversationContext = '';
