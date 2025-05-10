@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Render existing conversation messages
     function renderConversation() {
         if (!chatArea) return;
-        
+
         chatArea.innerHTML = '';
         conversationHistory.forEach(msg => {
             if (msg.role === "user" || msg.role === "model") {
@@ -137,7 +137,7 @@ ${recentMessages}
     // Handle sending messages
     async function handleSendMessage() {
         if (!userInput || !chatArea || !typingIndicator) return;
-        
+
         const message = userInput.value.trim();
         if (message === '') return;
 
@@ -203,7 +203,7 @@ ${recentMessages}
     // Handle keyboard visibility change on iOS
     function handleVisualViewportResize() {
         if (!window.visualViewport || !chatArea) return;
-        
+
         const isKeyboardVisible = window.visualViewport.height < window.innerHeight * 0.8;
         const keyboardHeight = isKeyboardVisible ? window.innerHeight - window.visualViewport.height : 0;
         const inputArea = document.querySelector('.input-area');
@@ -220,7 +220,7 @@ ${recentMessages}
     // Add a message to the chat UI
     function addMessageToChat(content, sender, scroll = true) {
         if (!chatArea) return;
-        
+
         const lastMsg = chatArea.lastElementChild?.querySelector('.message-bubble')?.textContent;
         if (lastMsg && lastMsg === content) return;
 
@@ -271,7 +271,7 @@ ${recentMessages}
                 alert("お使いのブラウザは音声合成をサポートしていません。");
                 return;
             }
-            
+
             const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.lang = 'ja-JP';
             utterance.rate = 0.9;
@@ -286,7 +286,7 @@ ${recentMessages}
                 if (jpVoice) utterance.voice = jpVoice;
                 speechSynthesis.speak(utterance);
             };
-            
+
             try {
                 if (speechSynthesis.getVoices().length > 0) {
                     speak();
@@ -308,7 +308,7 @@ ${recentMessages}
         };
 
         const copyBtn = document.createElement('button');
-        
+
         copyBtn.className = 'icon-btn';
         copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
             <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
@@ -394,9 +394,9 @@ ${recentMessages}
             contents: [systemInstruction, ...conversationHistory],
             generationConfig: {
                 temperature: isContextGeneration ? 0.7 : 0.9, // Higher for creative responses
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: isContextGeneration ? 50 : 300, // Allow longer responses
+                topK: 30,
+                topP: 0.85,
+                maxOutputTokens: isContextGeneration ? 50 : 180, // Allow longer responses
                 stopSequences: []
             },
             safetySettings: [
@@ -457,7 +457,7 @@ ${recentMessages}
             chatArea.scrollTop = chatArea.scrollHeight;
         }, 300);
     }
-    
+
     // Kiểm tra trước khi thêm sự kiện
     if (userInput) {
         userInput.addEventListener('focus', handleKeyboard);
