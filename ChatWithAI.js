@@ -268,9 +268,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const systemInstruction = {
             role: "system",
             parts: [{
-                text: `Context: ${contextSummary}\n\nYou are a friendly Japanese-speaking chatbot. 
-Please reply in natural, short Japanese (2-3 sentences), using casual tone, emojis, and a follow-up question if possible. 
-Do not repeat the context; just use it for understanding.`
+                text: "You are a friendly Japanese-speaking chatbot. Reply in short, casual Japanese."
             }]
         };
 
