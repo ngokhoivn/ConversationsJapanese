@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Japanese-Vietnamese Text Improvement Tool</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #8ab4f8;
+            --primary-dark: #7ba3e6;
+            --secondary-color: #81c995;
+            --secondary-dark: #72b586;
+            --danger-color: #f28b82;
+            --danger-dark: #e37b72;
+            --warning-color: #fdd663;
+            --warning-dark: #f0c94d;
+            --bg-dark: #121212;
+            --bg-darker: #0a0a0a;
+            --bg-card: #1e1e1e;
+            --text-primary: #e1e1e1;
+            --text-secondary: #b0b0b0;
+            --border-color: #333333;
+            --border-radius: 8px;
+            --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            color: var(--text-primary);
+        }
+
+        .dark-chat-container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            overflow-y: auto;
+            max-height: 95vh;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .chat-title {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .controls-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .icon-button {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: var(--bg-darker);
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: #202124;
+        }
+
+            .btn-primary:hover {
+                background-color: var(--primary-dark);
+            }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: #202124;
+        }
+
+            .btn-secondary:hover {
+                background-color: var(--secondary-dark);
+            }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: #202124;
+        }
+
+            .btn-warning:hover {
+                background-color: var(--warning-dark);
+            }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: #202124;
+        }
+
+            .btn-danger:hover {
+                background-color: var(--danger-dark);
+            }
+
+        button:disabled {
+            background-color: var(--border-color);
+            cursor: not-allowed;
+            opacity: 0.5;
+            color: var(--text-secondary);
+        }
+
+        select {
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            background-color: var(--bg-darker);
+            color: var(--text-primary);
+            min-width: 120px;
+        }
+
+        .text-area {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            min-height: 150px;
+            resize: vertical;
+            font-family: inherit;
+            background-color: var(--bg-darker);
+            color: var(--text-primary);
+        }
+
+            .text-area:focus {
+                outline: none;
+                border-color: var(--primary-color);
+                box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+            }
+
+            .text-area::placeholder {
+                color: var(--text-secondary);
+            }
+
+        .result-box {
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            background-color: var(--bg-darker);
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        .status {
+            padding: 12px 15px;
+            background-color: var(--bg-darker);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+            .status i {
+                color: var(--primary-color);
+            }
+
+        .loading {
+            padding: 15px;
+            background-color: var(--bg-darker);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+            .loading.hidden {
+                display: none;
+            }
+
+            .loading span {
+                color: var(--text-primary);
+            }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .suggestions {
+            margin-top: 10px;
+            color: var(--text-primary);
+        }
+
+        .suggestions-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            color: var(--warning-color);
+        }
+
+        .suggestions ul {
+            padding-left: 20px;
+            margin-top: 8px;
+        }
+
+        .suggestions li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+            .suggestions li:hover {
+                color: var(--primary-color);
+            }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* History styles */
+        .history-container {
+            padding: 15px;
+            background-color: var(--bg-darker);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            margin-top: 15px;
+        }
+
+        .history-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            color: var(--secondary-color);
+        }
+
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            position: relative;
+        }
+
+            .history-item:last-child {
+                border-bottom: none;
+            }
+
+            .history-item:hover {
+                background-color: rgba(138, 180, 248, 0.1);
+            }
+
+        .history-text {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 15px;
+            background-color: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            color: var(--text-secondary);
+            flex: 1;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+            .tab:first-child {
+                border-top-left-radius: var(--border-radius);
+                border-bottom-left-radius: var(--border-radius);
+            }
+
+            .tab:last-child {
+                border-top-right-radius: var(--border-radius);
+                border-bottom-right-radius: var(--border-radius);
+            }
+
+            .tab.active {
+                background-color: var(--primary-color);
+                color: #202124;
+                border-color: var(--primary-color);
+            }
+
+        .tab-content {
+            display: none;
+        }
+
+            .tab-content.active {
+                display: block;
+            }
+
+        .clear-history {
+            background-color: var(--danger-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+            float: right;
+        }
+
+            .clear-history:hover {
+                background-color: var(--danger-dark);
+            }
+
+        .no-history {
+            color: var(--text-secondary);
+            font-style: italic;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        /* History item actions */
+        .history-actions {
+            display: none;
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            gap: 5px;
+        }
+
+        .history-item:hover .history-actions {
+            display: flex;
+        }
+
+        .history-action-btn {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+            .history-action-btn:hover {
+                background-color: var(--primary-color);
+                color: #202124;
+            }
+
+        /* Translation styles */
+        .translation {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(138, 180, 248, 0.1);
+            border-radius: var(--border-radius);
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: none;
+        }
+
+            .translation.show {
+                display: block;
+            }
+
+        .translation-label {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 600px) {
+            .dark-chat-container {
+                border-radius: var(--border-radius);
+                max-width: 100%;
+                height: auto;
+                max-height: 100vh;
+                padding: 15px;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .controls-group {
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            select {
+                width: 100%;
+            }
+
+            .text-area {
+                min-height: 120px;
+            }
+
+            .history-container {
+                margin-top: 10px;
+            }
+
+            body {
+                padding: 10px;
+            }
+        }
+		
+    /* Thêm vào phần style */
+    .vocabulary {
+        margin-top: 10px;
+        padding: 10px;
+        background-color: rgba(138, 180, 248, 0.1);
+        border-radius: var(--border-radius);
+        font-size: 13px;
+    }
+    
+    .vocabulary-title {
+        font-weight: bold;
+        color: var(--secondary-color);
+        margin-bottom: 5px;
+    }
+    
+    .vocabulary-item {
+        margin-bottom: 5px;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .vocabulary-kanji {
+        color: var(--primary-color);
+    }
+    
+    .vocabulary-hiragana {
+        color: var(--warning-color);
+    }
+    
+    .vocabulary-meaning {
+        color: var(--text-secondary);
+    }		
+	
+	.vocabulary-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 10px;
+	}
+
+	.close-vocab-btn {
+		background: none;
+		border: none;
+		color: var(--text-secondary);
+		cursor: pointer;
+		font-size: 16px;
+	}
+
+	.close-vocab-btn:hover {
+		color: var(--danger-color);
+	}	
+	
+	/* Floating Chat Button */
+	.chat-button {
+		position: fixed;
+		top: calc(env(safe-area-inset-top, 10px) + 10px);
+		right: 10px;
+		background: linear-gradient(135deg, #8ab4f8, #7ba3e6);
+		color: #202124;
+		border: none;
+		border-radius: 50%;
+		width: 48px;
+		height: 48px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+		z-index: 2000;
+		transition: transform 0.2s ease, box-shadow 0.2s ease;
+	}
+
+	.chat-button:hover {
+		transform: scale(1.1);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+	}
+
+	.chat-button:active {
+		transform: scale(1);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+	}
+
+	.chat-button svg {
+		width: 24px;
+		height: 24px;
+	}	
+	
+	
+    </style>
+</head>
+<body>
+	<!-- Floating Chat Button -->
+	<button class="chat-button" id="chat-button" title="Back to Chat">
+		<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+			<path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+		</svg>
+	</button>
+    <div class="dark-chat-container">
+        <div class="chat-header">
+            <div class="chat-title">
+                <i class="fas fa-language"></i> Japanese-Vietnamese Text Tool
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="editor">Editor</div>
+            <div class="tab" data-tab="history">History</div>
+        </div>
+
+        <div id="editor" class="tab-content active">
+            <div class="toolbar">
+                <div class="controls-group">
+                    <div class="controls-group">
+                        <button id="reverseSuggestBtn" class="icon-button btn-warning" title="Alternative expressions" disabled>
+                            <i class="fas fa-exchange-alt"></i>
+                        </button>
+						<button id="improveBtn" class="icon-button btn-primary" title="Improve with AI" disabled>
+							<i class="fas fa-magic"></i>
+						</button>
+						<button id="suggestBtn" class="icon-button btn-warning" title="Next sentence suggestions" disabled>
+							<i class="fas fa-comment-dots"></i>
+						</button>
+                        <button id="clearSuggestionsBtn" class="icon-button btn-danger" title="Clear suggestions">
+                            <i class="fas fa-broom"></i>
+                        </button>						
+						<button id="saveBtn" class="icon-button btn-secondary" title="Save to history" disabled>
+							<i class="fas fa-save"></i>
+						</button>
+					</div>	
+                </div>
+            </div>
+
+			<div class="status" id="status">
+				<i class="fas fa-info-circle"></i>
+				<span>Enter text to analyze...</span>
+			</div>
+			
+			<textarea id="editableText" class="text-area" placeholder="Enter your text here..."></textarea>
+
+			<div style="text-align: right; margin-top: 5px;">
+			  <button id="vocabBtn" class="btn-secondary" style="padding: 5px 10px; font-size: 13px;">
+				📘 Trích xuất từ vựng
+			  </button>
+			</div>
+
+
+
+            <div id="result" class="result-box hidden">
+                <div class="japanese" id="japanese-text"></div>
+            </div>
+
+			<div id="vocabulary" class="vocabulary hidden">
+				<div class="vocabulary-header">
+					<div class="vocabulary-title">
+						<i class="fas fa-book"></i>
+						<span>Từ vựng trích xuất</span>
+					</div>
+					<button class="icon-button close-vocab-btn" title="Đóng">
+						<i class="fas fa-times"></i>
+					</button>
+				</div>
+				<div id="vocabList"></div>
+			</div>
+			
+            <div class="loading hidden" id="loading">
+                <div class="spinner"></div>
+                <span>Processing with Gemini...</span>
+            </div>
+
+            <div id="corrections" class="suggestions hidden">
+                <div class="suggestions-title">
+                    <i class="fas fa-lightbulb"></i>
+                    <span>Improvement suggestions</span>
+                </div>
+                <div id="suggestions"></div>
+            </div>
+
+            <div id="nextSuggestions" class="suggestions hidden">
+                <div class="suggestions-title">
+                    <i class="fas fa-comment-dots"></i>
+                    <span>Next sentence suggestions</span>
+                </div>
+                <div id="nextSuggestionList"></div>
+            </div>
+        </div>
+
+        <div id="history" class="tab-content">
+            <div class="history-container">
+                <div class="history-title">
+                    <i class="fas fa-history"></i>
+                    <span>Saved History</span>
+                </div>
+                <div id="historyList" class="history-list">
+                    <div class="no-history">No items saved yet</div>
+                </div>
+                <button id="clearHistoryBtn" class="clear-history hidden">
+                    <i class="fas fa-trash"></i> Clear History
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+	<script src="script.js"></script>        
+
+</body>
+</html>
