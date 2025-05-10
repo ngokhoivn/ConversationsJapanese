@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Update conversation context every 5 user messages
     async function updateConversationContext() {
         if (messageCount % 5 === 0 && messageCount > 0) {
-            const recentMessages = conversationHistory.slice(-10).map(msg => 
+            const recentMessages = conversationHistory.slice(-10).map(msg =>
                 `${msg.role === 'user' ? 'ユーザー' : 'ボット'}: ${msg.parts[0].text}`
             ).join('\n');
 
@@ -291,7 +291,7 @@ ${recentMessages}
         const systemInstruction = {
             role: "model",
             parts: [{
-                text: isContextGeneration 
+                text: isContextGeneration
                     ? "会話から簡潔なコンテキストを生成してください。"
                     : `You are a cheerful and knowledgeable Japanese chatbot. Provide detailed, engaging, and thoughtful responses in casual Japanese (3-5 sentences). Use natural slang, emojis (e.g., 😄, めっちゃ), and occasionally ask relevant follow-up questions or share related insights to deepen the conversation. Avoid generic prompts like "他に何かある？" or "まだ何か話したい？". Stay context-aware using: ${conversationContext}`
             }]
@@ -342,7 +342,7 @@ ${recentMessages}
             }
         } catch (error) {
             console.error("Error sending to Gemini API:", error);
-            return isContextGeneration 
+            return isContextGeneration
                 ? "コンテキスト生成に失敗しました。"
                 : "エラーが発生しました。もう一度試してみてください。(⌒_⌒;)";
         }
@@ -357,6 +357,13 @@ ${recentMessages}
         ];
         return responses[Math.floor(Math.random() * responses.length)];
     }
+
+    function handleKeyboard() {
+        setTimeout(() => {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }, 300);
+    }
+    userInput.addEventListener('focus', handleKeyboard);
 
     chatArea.addEventListener('touchstart', function () {
         chatArea.style.overflowY = 'scroll';
