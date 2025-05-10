@@ -1,4 +1,4 @@
-﻿document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function () {
     // DOM Elements
     const chatArea = document.getElementById('chat-area');
     const userInput = document.getElementById('user-input');
@@ -47,7 +47,7 @@
 
     // Conversation management functions
     function generateConversationId() {
-        return 'conv_' + Math.random().toString(36).substring(2, 15);
+        return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     }
 
     function generateConversationTitle() {
@@ -231,48 +231,18 @@
     }
 
     // Hàm tóm tắt hội thoại
-    async function summarizeConversation(history) {
-        const API_KEY = getCurrentApiKey();
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
-
-        const conversationText = history
-            .map(msg => `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.parts[0].text}`)
-            .join('\n');
-
-        const summaryPrompt = {
-            role: "user",
-            parts: [{
-                text: `Summarize the following conversation in 2-3 concise English sentences, focusing on the user's main intent and topic:\n\n${conversationText}`
-            }]
-        };
-
-        const requestBody = {
-            contents: [summaryPrompt],
-            generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 100,
-            },
-            safetySettings: [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
-            ]
-        };
-
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) throw new Error(`Summary API request failed with status ${response.status}`);
-            const data = await response.json();
-            return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to summarize.";
-        } catch (error) {
-            console.error("Error summarizing conversation:", error);
-            return "Summary unavailable due to an error.";
+    async function summarizeConversation(history, retries = 3) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(API_URL, { ... });
+                if (!response.ok) throw new Error(`Status ${response.status}`);
+                const data = await response.json();
+                return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to summarize.";
+            } catch (error) {
+                console.warn(`Retry ${i + 1}/${retries} for summary: ${error}`);
+                if (i === retries - 1) return "Summary unavailable.";
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
     }
 
@@ -635,25 +605,24 @@ Do not repeat the context; just use it for understanding.`
 
     // Load a conversation from history
     function loadConversation(conversationId) {
-        const conversationsList = JSON.parse(localStorage.getItem('conversations_list')) || [];
-        const conversation = conversationsList.find(conv => conv.id === conversationId);
-        if (!conversation) return;
-
         const storedConversation = localStorage.getItem(`conversation_${conversationId}`);
-        if (!storedConversation) return;
-
-        const conversationData = JSON.parse(storedConversation);
-        localStorage.setItem('conversation_id', conversationId);
-        conversationHistory = conversationData.messages || [];
-
-        if (!Array.isArray(conversationHistory)) {
-            console.warn("Invalid conversation data, resetting...");
-            startNewConversation();
+        if (!storedConversation) {
+            console.error("Conversation not found:", conversationId);
             return;
         }
-
-        localStorage.setItem('conversation_history', JSON.stringify(conversationHistory));
-        renderConversation();
+        try {
+            const conversationData = JSON.parse(storedConversation);
+            if (!conversationData?.messages || !Array.isArray(conversationData.messages)) {
+                throw new Error("Invalid conversation data");
+            }
+            conversationHistory = conversationData.messages;
+            localStorage.setItem('conversation_id', conversationId);
+            localStorage.setItem('conversation_history', JSON.stringify(conversationHistory));
+            renderConversation();
+        } catch (error) {
+            console.error("Error loading conversation:", error);
+            startNewConversation();
+        }
     }
 
     function smoothScrollToBottom() {
