@@ -381,23 +381,40 @@ ${recentMessages}
         const API_KEY = getCurrentApiKey();
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
 
+        // Chỉ dẫn độ dài được tách riêng để dễ điều chỉnh
+        const LENGTH_LIMITS = {
+            context: { tokens: 50, chars: 100, sentences: 1 },
+            normal: { tokens: 180, chars: 300, sentences: 4 }
+        };
+
+        const limits = isContextGeneration ? LENGTH_LIMITS.context : LENGTH_LIMITS.normal;
+
+        const lengthInstruction = isContextGeneration
+            ? `必ず${limits.tokens}トークン以内 (約${limits.chars}文字) で簡潔に回答してください。`
+            : `必ず${limits.tokens}トークン以内 (${limits.sentences}文程度) で回答してください。簡潔で自然な日本語でお願いします。`;
+
         const systemInstruction = {
             role: "model",
             parts: [{
                 text: isContextGeneration
-                    ? "会話から簡潔なコンテキストを生成してください。"
-                    : `You are a cheerful and knowledgeable Japanese chatbot. Provide detailed, engaging, and thoughtful responses in casual Japanese (3-5 sentences). Use natural slang, emojis (e.g., 😄, めっちゃ), and occasionally ask relevant follow-up questions or share related insights to deepen the conversation. Avoid generic prompts like "他に何かある？" or "まだ何か話したい？". Stay context-aware using: ${conversationContext}`
+                    ? `現在の会話を${limits.sentences}文で要約してください。${lengthInstruction}`
+                    : `日本語の会話アシスタントとして、以下の点に注意して回答してください:
+                   - フレンドリーでカジュアルな日本語 (${limits.sentences}文程度)
+                   - 絵文字やスラングを適度に使用
+                   - 具体的で深堀りできる内容を心がける
+                   - コンテキスト: ${conversationContext}
+                   ${lengthInstruction}`
             }]
         };
 
         const requestBody = {
             contents: [systemInstruction, ...conversationHistory],
             generationConfig: {
-                temperature: isContextGeneration ? 0.7 : 0.9, // Higher for creative responses
-                topK: 30,
-                topP: 0.85,
-                maxOutputTokens: isContextGeneration ? 50 : 180, // Allow longer responses
-                stopSequences: []
+                temperature: isContextGeneration ? 0.7 : 0.82, // 0.8-0.85が最適
+                topK: isContextGeneration ? 20 : 30, // Context生成時はより集中
+                topP: 0.88,
+                maxOutputTokens: limits.tokens,
+                stopSequences: isContextGeneration ? ["。"] : []
             },
             safetySettings: [
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -421,23 +438,42 @@ ${recentMessages}
             }
 
             const data = await response.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
+            // Xử lý post-generation để đảm bảo độ dài
             if (text) {
-                if (conversationHistory.length > 20) {
-                    conversationHistory = [
-                        ...conversationHistory.slice(conversationHistory.length - 10)
-                    ];
+                // Chuẩn hóa độ dài
+                if (isContextGeneration) {
+                    // Ưu tiên giữ nguyên câu hoàn chỉnh
+                    const sentences = text.split(/[。！？]/);
+                    text = sentences.slice(0, limits.sentences).join('。');
+                    if (text.length > limits.chars) {
+                        text = text.substring(0, limits.chars).replace(/[^。]$/, '。');
+                    }
+                } else {
+                    // Đối với hội thoại thông thường
+                    if (text.length > limits.chars * 1.2) { // Cho phép vượt 20%
+                        const sentences = text.split(/[。！？]/);
+                        text = sentences.slice(0, limits.sentences + 1).join('。');
+                    }
                 }
-                return text;
-            } else {
-                throw new Error("Invalid API response structure");
+
+                // Cập nhật lịch sử hội thoại (giữ lại 10 tin nhắn gần nhất)
+                if (conversationHistory.length > 20) {
+                    conversationHistory = conversationHistory.slice(-10);
+                }
+
+                return text.trim() || (isContextGeneration
+                    ? "要約を生成できませんでした"
+                    : "もう一度言い直してもらえますか？(^_^;)");
             }
+
+            throw new Error("Empty response from API");
         } catch (error) {
-            console.error("Error sending to Gemini API:", error);
+            console.error("API Error:", error);
             return isContextGeneration
-                ? "コンテキスト生成に失敗しました。"
-                : "エラーが発生しました。もう一度試してみてください。(⌒_⌒;)";
+                ? "要約生成エラー"
+                : "エラーが発生しました。もう一度お試しください！";
         }
     }
 
