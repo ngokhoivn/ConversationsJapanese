@@ -232,16 +232,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Hàm tóm tắt hội thoại
     async function summarizeConversation(history, retries = 3) {
+        const API_KEY = getCurrentApiKey();
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
+
+        const recentHistory = history.slice(-10);
+        const prompt = "Hãy tóm tắt cuộc trò chuyện này bằng tiếng Nhật trong 1-2 câu ngắn gọn:";
+
+        const requestBody = {
+            contents: [
+                {
+                    role: "user",
+                    parts: [{ text: `${prompt}\n\n${recentHistory.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}` }
+                    ]
+                }
+            ],
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 100
+            }
+        };
+
         for (let i = 0; i < retries; i++) {
             try {
-                const response = await fetch(API_URL, { ... });
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
                 if (!response.ok) throw new Error(`Status ${response.status}`);
                 const data = await response.json();
-                return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to summarize.";
+                return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Không thể tóm tắt";
             } catch (error) {
                 console.warn(`Retry ${i + 1}/${retries} for summary: ${error}`);
-                if (i === retries - 1) return "Summary unavailable.";
+                if (i === retries - 1) return "Tóm tắt không khả dụng";
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                rotateApiKey(); // Xoay API key khi thử lại
             }
         }
     }
@@ -252,23 +278,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const API_KEY = getCurrentApiKey();
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
 
+        // Giới hạn lịch sử hội thoại để tránh quá dài
         const recentHistory = conversationHistory.slice(-15);
-
-        let contextSummary = localStorage.getItem('conversation_summary') || "";
-        if (conversationHistory.length > 10 && !contextSummary) {
-            contextSummary = await summarizeConversation(conversationHistory);
-            localStorage.setItem('conversation_summary', contextSummary);
-        }
-
-        if (conversationHistory.length % 10 === 0) {
-            contextSummary = await summarizeConversation(conversationHistory);
-            localStorage.setItem('conversation_summary', contextSummary);
-        }
 
         const systemInstruction = {
             role: "system",
             parts: [{
-                text: "You are a friendly Japanese-speaking chatbot. Reply in short, casual Japanese."
+                text: "Bạn là một chatbot thân thiện nói tiếng Nhật. Hãy trả lời bằng tiếng Nhật ngắn gọn, thân mật."
             }]
         };
 
@@ -296,15 +312,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 body: JSON.stringify(requestBody)
             });
 
-            if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
-            const data = await response.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!response.ok) {
+                // Nếu lỗi 429 (quá nhiều request) hoặc 403 (bị từ chối)
+                if (response.status === 429 || response.status === 403) {
+                    rotateApiKey(); // Xoay API key ngay lập tức
+                    throw new Error(`API key bị giới hạn, đã chuyển sang key mới`);
+                }
+                throw new Error(`API request failed with status ${response.status}`);
+            }
 
-            if (text) {
-                return text;
-            } else {
+            const data = await response.json();
+
+            // Kiểm tra kỹ cấu trúc response
+            if (!data.candidates || !data.candidates[0].content.parts[0].text) {
                 throw new Error("Invalid API response structure");
             }
+
+            // Kiểm tra nội dung có bị filter không
+            if (data.candidates[0].safetyRatings &&
+                data.candidates[0].safetyRatings.some(r => r.blocked)) {
+                throw new Error("Response blocked by safety filter");
+            }
+
+            return data.candidates[0].content.parts[0].text;
         } catch (error) {
             console.error("Error sending to Gemini API:", error);
             throw error;
@@ -388,12 +418,11 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem('conversations_list', JSON.stringify(conversationsList));
     }
 
-    // Handle sending messages
     async function handleSendMessage() {
         const message = userInput.value.trim();
         if (message === '') return;
 
-        // Add user message to chat
+        // Thêm message vào chat
         addMessageToChat(message, 'user');
         conversationHistory.push({
             role: "user",
@@ -401,38 +430,51 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         saveConversation();
 
-        // Clear input and show typing indicator
+        // Clear input và hiển thị indicator
         userInput.value = '';
         typingIndicator.style.display = 'flex';
         chatArea.scrollTop = chatArea.scrollHeight;
 
-        try {
-            // Get AI response
-            const response = await sendToGeminiAPI(message);
+        let retries = 3;
+        let lastError = null;
 
-            // Add AI response to chat
-            addMessageToChat(response, 'bot');
-            conversationHistory.push({
-                role: "model",
-                parts: [{ text: response }]
-            });
-            saveConversation();
-        } catch (error) {
-            console.error("API Error:", error);
-            rotateApiKey();
+        for (let i = 0; i < retries; i++) {
+            try {
+                // Lấy phản hồi từ AI
+                const response = await sendToGeminiAPI(message);
 
-            // Use fallback response
-            const fallbackResponse = getFallbackResponse(message);
-            addMessageToChat(fallbackResponse, 'bot');
-            conversationHistory.push({
-                role: "model",
-                parts: [{ text: fallbackResponse }]
-            });
-            saveConversation();
-        } finally {
-            typingIndicator.style.display = 'none';
-            chatArea.scrollTop = chatArea.scrollHeight;
+                // Thêm phản hồi vào chat
+                addMessageToChat(response, 'bot');
+                conversationHistory.push({
+                    role: "model",
+                    parts: [{ text: response }]
+                });
+                saveConversation();
+
+                // Thoát khỏi vòng lặp nếu thành công
+                break;
+            } catch (error) {
+                console.error(`Attempt ${i + 1} failed:`, error);
+                lastError = error;
+
+                if (i === retries - 1) {
+                    // Sử dụng phản hồi dự phòng khi thất bại
+                    const fallbackResponse = getFallbackResponse(message);
+                    addMessageToChat(fallbackResponse, 'bot');
+                    conversationHistory.push({
+                        role: "model",
+                        parts: [{ text: fallbackResponse }]
+                    });
+                    saveConversation();
+                } else {
+                    // Chờ một chút trước khi thử lại
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
         }
+
+        typingIndicator.style.display = 'none';
+        chatArea.scrollTop = chatArea.scrollHeight;
     }
 
     // Initialize conversation manager
